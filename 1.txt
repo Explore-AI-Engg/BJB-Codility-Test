@@ -1,0 +1,85 @@
+package com.codility;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
+import jakarta.persistence.*;
+import java.util.Map;
+import java.util.HashMap;
+
+// --- Entity ---
+@Entity
+@Table(name = "task")
+class Task {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 200)
+    private String description;
+
+    private Long priority;
+
+    // Standard Getters and Setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Long getPriority() { return priority; }
+    public void setPriority(Long priority) { this.priority = priority; }
+}
+
+// --- Repository ---
+@Repository
+interface TaskRepository extends JpaRepository<Task, Long> {
+}
+
+// --- Controller ---
+@RestController
+@RequestMapping("/tasks")
+class TaskController {
+
+    private final TaskRepository taskRepository;
+
+    public TaskController(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Object> updateTask(@PathVariable Long id, @RequestBody Task taskUpdate) {
+        
+        // Requirement: Check if description is null or missing
+        if (taskUpdate.getDescription() == null) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("message", "Task description is required");
+            error.put("status", 400);
+            return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        }
+
+        // Requirement: Check if task exists
+        return taskRepository.findById(id)
+            .map(existingTask -> {
+                existingTask.setDescription(taskUpdate.getDescription());
+                existingTask.setPriority(taskUpdate.getPriority());
+                taskRepository.save(existingTask);
+
+                // Return 200 with the updated fields
+                Map<String, Object> response = new HashMap<>();
+                response.put("description", existingTask.getDescription());
+                response.put("priority", existingTask.getPriority());
+                return new ResponseEntity<Object>(response, HttpStatus.OK);
+            })
+            .orElseGet(() -> {
+                // Requirement: Return 404 if not found
+                Map<String, Object> error = new HashMap<>();
+                error.put("message", "Cannot find task with given id");
+                error.put("status", 404);
+                return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+            });
+    }
+}

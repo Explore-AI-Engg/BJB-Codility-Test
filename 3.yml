@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.application.name }}
+  labels:
+    app: {{ .Values.application.name }}
+    role: {{ .Values.application.role }}
+    release: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.application.replicaCount }}
+  revisionHistoryLimit: {{ .Values.application.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      app: {{ .Values.application.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.application.name }}
+        role: {{ .Values.application.role }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Values.application.name }}
+          image: {{ if .Values.application.image.registry }}{{ .Values.application.image.registry }}/{{ end }}{{ .Values.application.image.name }}
+          ports:
+            - containerPort: {{ .Values.application.port }}
+          {{- if .Values.application.env }}
+          env:
+            {{- range $key, $value := .Values.application.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          resources:
+            requests:
+              memory: {{ .Values.application.resources.memory.request }}
+              cpu: {{ .Values.application.resources.cpu.request }}
+            limits:
+              memory: {{ .Values.application.resources.memory.limit }}
+              cpu: {{ .Values.application.resources.cpu.limit }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.application.probes.liveness.path }}
+              port: {{ .Values.application.port }}
+            initialDelaySeconds: {{ .Values.application.probes.liveness.initialDelay }}
+            timeoutSeconds: {{ .Values.application.probes.liveness.timeoutSeconds }}
+            periodSeconds: {{ .Values.application.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.application.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.application.probes.readiness.path }}
+              port: {{ .Values.application.port }}
+            initialDelaySeconds: {{ .Values.application.probes.readiness.initialDelay }}
+            timeoutSeconds: {{ .Values.application.probes.readiness.timeoutSeconds }}
+            periodSeconds: {{ .Values.application.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.application.probes.readiness.failureThreshold }}

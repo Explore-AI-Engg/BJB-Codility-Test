@@ -1,0 +1,67 @@
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public class VisitCounter {
+
+    public Map<Long, Long> count(Map<String, UserStats>[] microservicesStats) {
+        // Handle null or empty input by returning an empty map
+        if (microservicesStats == null || microservicesStats.length == 0) {
+            return new HashMap<>();
+        }
+
+        return Arrays.stream(microservicesStats)
+            // 1. Filter out null maps in the array
+            .filter(map -> map != null)
+            // 2. Flatten all map entries into a single stream
+            .flatMap(map -> map.entrySet().stream())
+            // 3. Filter out null entries or null UserStats values
+            .filter(entry -> entry != null && entry.getKey() != null && entry.getValue() != null)
+            // 4. Validate and Parse ID, and ensure visitCount is present
+            .flatMap(entry -> {
+                Long userId = parseLong(entry.getKey());
+                Optional<Long> visits = entry.getValue().getVisitCount();
+                
+                if (userId != null && visits != null && visits.isPresent()) {
+                    return Stream.of(new UserVisit(userId, visits.get()));
+                }
+                return Stream.empty();
+            })
+            // 5. Aggregate: Group by UserID and sum the visit counts
+            .collect(Collectors.groupingBy(
+                UserVisit::getUserId,
+                Collectors.summingLong(UserVisit::getVisitCount)
+            ));
+    }
+
+    /**
+     * Helper to safely parse the String key to a Long.
+     * Returns null if parsing fails.
+     */
+    private Long parseLong(String str) {
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Internal helper class to hold validated data during streaming
+     */
+    private static class UserVisit {
+        private final Long userId;
+        private final Long visitCount;
+
+        UserVisit(Long userId, Long visitCount) {
+            this.userId = userId;
+            this.visitCount = visitCount;
+        }
+
+        Long getUserId() { return userId; }
+        Long getVisitCount() { return visitCount; }
+    }
+}
